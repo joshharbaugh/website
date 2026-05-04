@@ -59,6 +59,7 @@ interface AnimState {
   bitePhase: number;
   missFlash: number;
   catchAnimation: CatchAnimation | null;
+  sprites: { idle: HTMLImageElement | null; catchSprite: HTMLImageElement | null };
 }
 
 export function useFishingGame(
@@ -94,6 +95,7 @@ export function useFishingGame(
     bitePhase: 0,
     missFlash: 0,
     catchAnimation: null,
+    sprites: { idle: null, catchSprite: null },
   });
 
   const rafRef = useRef<number | null>(null);
@@ -159,6 +161,18 @@ export function useFishingGame(
       window.removeEventListener("keydown", onKey);
     };
   }, [canvasRef, doReel]);
+
+  useEffect(() => {
+    const load = (src: string, key: "idle" | "catchSprite") => {
+      const img = new Image();
+      img.onload = () => {
+        animRef.current.sprites[key] = img;
+      };
+      img.src = src;
+    };
+    load("/fishing-game/character.png", "idle");
+    load("/fishing-game/character-catch.png", "catchSprite");
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -271,7 +285,20 @@ export function useFishingGame(
       drawGround(ctx!);
       drawDock(ctx!);
       drawParticles(ctx!, anim.particles);
-      drawCharacter(ctx!, anim.frame, anim.gameState, anim.castProgress);
+      let catchFrame = -1;
+      if (anim.catchAnimation) {
+        const { phase, t } = anim.catchAnimation;
+        const totalT = phase === 0 ? t : phase === 1 ? 20 + t : 48 + t;
+        catchFrame = Math.min(Math.floor(totalT / 10), 5);
+      }
+      drawCharacter(
+        ctx!,
+        anim.frame,
+        anim.gameState,
+        anim.sprites.idle,
+        anim.sprites.catchSprite,
+        catchFrame
+      );
       drawLine(
         ctx!,
         anim.gameState,

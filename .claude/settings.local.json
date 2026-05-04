@@ -6,7 +6,8 @@
       "Bash(Get-Content \"C:\\\\Users\\\\Josh\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Josh-website\\\\fe41c56f-0d5a-4e02-aaae-6e075daad3db\\\\tasks\\\\bpuv2ch4e.output\" -Wait)",
       "Bash(Select-String --line-buffered \"Error|error|Success|https://|failed|Ready|Deployed|inspect\")",
       "mcp__claude_ai_Google_Drive__create_file",
-      "PowerShell(git push *)"
+      "PowerShell(git push *)",
+      "Bash(npx tsc *)"
     ]
   }
 }
