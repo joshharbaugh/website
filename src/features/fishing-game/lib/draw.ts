@@ -280,72 +280,180 @@ export function drawDock(ctx: CanvasRenderingContext2D) {
 
 // ─── Character ───────────────────────────────────────────────────────────────
 
-export function drawCharacter(ctx: CanvasRenderingContext2D, frame: number) {
-  const cx = CHAR_X,
-    cy = DOCK_Y - 2;
-  const blink = Math.floor(frame / 50) % 8 === 0;
+// Rod angle constants (radians, canvas convention: 0=right, negative=up)
+const FISHING_ANGLE = Math.atan2(-52, 90); // ≈ -0.52 — rod extended forward over water
+const IDLE_ANGLE = -1.15;                   // ≈ -66° — rod held upright, at rest
+const WINDUP_ANGLE = -2.5;                  // ≈ -143° — rod swept back over shoulder
+const THROW_ANGLE = -0.65;                  // ≈ -37° — peak of forward throw
 
-  ctx.fillStyle = "#00000050";
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+function easeIn(t: number): number {
+  return t * t;
+}
+function easeOut(t: number): number {
+  return 1 - (1 - t) * (1 - t);
+}
+
+function getRodAngle(gameState: string, castProgress: number): number {
+  if (gameState === "idle") return IDLE_ANGLE;
+  if (gameState === "casting") {
+    const t = castProgress;
+    if (t < 0.25) return lerp(IDLE_ANGLE, WINDUP_ANGLE, easeIn(t / 0.25));
+    if (t < 0.72) return lerp(WINDUP_ANGLE, THROW_ANGLE, easeOut((t - 0.25) / 0.47));
+    return lerp(THROW_ANGLE, FISHING_ANGLE, easeOut((t - 0.72) / 0.28));
+  }
+  return FISHING_ANGLE; // waiting, biting
+}
+
+export function drawCharacter(
+  ctx: CanvasRenderingContext2D,
+  frame: number,
+  gameState: string,
+  castProgress: number
+) {
+  const cx = CHAR_X;
+  const cy = DOCK_Y - 2;
+  const blink = Math.floor(frame / 60) % 7 === 0;
+  const isBiting = gameState === "biting";
+  const lean = isBiting ? 2 : 0; // upper body shifts forward when biting
+
+  const rodAngle = getRodAngle(gameState, castProgress);
+  const rodBaseX = cx + 22 + lean;
+  const rodBaseY = cy - 10;
+  const rodLen = 106;
+  const rodTipX = pr(rodBaseX + Math.cos(rodAngle) * rodLen);
+  const rodTipY = pr(rodBaseY + Math.sin(rodAngle) * rodLen);
+
+  // Shadow
+  ctx.fillStyle = "#00000048";
   ctx.beginPath();
-  ctx.ellipse(cx + 9, DOCK_Y + 18, 13, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 11, DOCK_Y + 15, 13, 3, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#1e0e08";
-  ctx.fillRect(cx + 2, cy + 12, 8, 7);
-  ctx.fillRect(cx + 12, cy + 12, 8, 7);
-  ctx.fillStyle = "#2a1610";
-  ctx.fillRect(cx + 2, cy + 12, 3, 7);
-  ctx.fillRect(cx + 12, cy + 12, 3, 7);
-  ctx.fillStyle = "#223050";
-  ctx.fillRect(cx, cy + 4, 20, 10);
-  ctx.fillStyle = "#2a3a62";
-  ctx.fillRect(cx, cy + 4, 3, 10);
-  ctx.fillStyle = "#3a2008";
-  ctx.fillRect(cx, cy + 2, 20, 4);
-  ctx.fillStyle = "#c8a020";
-  ctx.fillRect(cx + 8, cy + 2, 5, 4);
-  ctx.fillStyle = "#e8c030";
-  ctx.fillRect(cx + 9, cy + 3, 3, 2);
-  ctx.fillStyle = "#2e5880";
-  ctx.fillRect(cx - 2, cy - 10, 24, 14);
-  ctx.fillStyle = "#3a6896";
-  ctx.fillRect(cx - 2, cy - 10, 4, 14);
-  ctx.fillStyle = "#b87030";
-  ctx.fillRect(cx + 4, cy - 10, 12, 14);
-  ctx.fillStyle = "#d08840";
-  ctx.fillRect(cx + 6, cy - 10, 3, 14);
+
+  // Left arm (behind body, draw first)
+  ctx.fillStyle = "#3a5c30";
+  ctx.fillRect(cx - 4, cy - 24, 5, 11);
   ctx.fillStyle = "#c8906a";
-  ctx.fillRect(cx - 6, cy - 8, 6, 10);
-  ctx.fillRect(cx + 22, cy - 12, 6, 14);
-  ctx.fillStyle = "#3a2008";
-  ctx.fillRect(cx + 22, cy - 12, 6, 3);
+  ctx.fillRect(cx - 5, cy - 14, 6, 5);
+
+  // Boots
+  ctx.fillStyle = "#1a0e08";
+  ctx.fillRect(cx + 3, cy + 4, 7, 7);
+  ctx.fillRect(cx + 13, cy + 4, 7, 7);
+  ctx.fillStyle = "#2e1c0e";
+  ctx.fillRect(cx + 3, cy + 4, 3, 7);
+  ctx.fillRect(cx + 13, cy + 4, 3, 7);
+
+  // Waders / pants
+  ctx.fillStyle = "#1c2840";
+  ctx.fillRect(cx + 4, cy - 10, 6, 15);
+  ctx.fillRect(cx + 13, cy - 10, 6, 15);
+  ctx.fillStyle = "#26344e";
+  ctx.fillRect(cx + 4, cy - 10, 2, 15);
+  ctx.fillRect(cx + 13, cy - 10, 2, 15);
+
+  // Fishing vest
+  ctx.fillStyle = "#3a5c30";
+  ctx.fillRect(cx + 1 + lean, cy - 26, 22, 17);
+  ctx.fillStyle = "#4a7240";
+  ctx.fillRect(cx + 1 + lean, cy - 26, 4, 17);
+  // Chest pockets
+  ctx.fillStyle = "#304c28";
+  ctx.fillRect(cx + 6 + lean, cy - 20, 5, 4);
+  ctx.fillRect(cx + 14 + lean, cy - 20, 5, 4);
+  ctx.fillStyle = "#3a5c30";
+  ctx.fillRect(cx + 7 + lean, cy - 19, 3, 3);
+  ctx.fillRect(cx + 15 + lean, cy - 19, 3, 3);
+  // Shirt collar
+  ctx.fillStyle = "#c8a030";
+  ctx.fillRect(cx + 8 + lean, cy - 28, 8, 4);
+
+  // Belt
+  ctx.fillStyle = "#2a1808";
+  ctx.fillRect(cx + 1 + lean, cy - 11, 22, 3);
+  ctx.fillStyle = "#c8a020";
+  ctx.fillRect(cx + 10 + lean, cy - 11, 4, 3);
+  ctx.fillStyle = "#e8c030";
+  ctx.fillRect(cx + 11 + lean, cy - 10, 2, 1);
+
+  // Head
   ctx.fillStyle = "#c89060";
-  ctx.fillRect(cx + 2, cy - 26, 16, 15);
+  ctx.fillRect(cx + 3 + lean, cy - 40, 16, 14);
   ctx.fillStyle = "#d8a070";
-  ctx.fillRect(cx + 2, cy - 26, 3, 15);
+  ctx.fillRect(cx + 3 + lean, cy - 40, 3, 14);
+  ctx.fillStyle = "#b87850";
+  ctx.fillRect(cx + 1 + lean, cy - 37, 3, 6); // ear
+  ctx.fillStyle = "#a06848";
+  ctx.fillRect(cx + 2 + lean, cy - 37, 1, 6);
+
+  // Eyebrow
+  ctx.fillStyle = "#6a3820";
+  if (isBiting) {
+    ctx.fillRect(cx + 12 + lean, cy - 34, 5, 1);
+    ctx.fillRect(cx + 11 + lean, cy - 35, 2, 1); // furrowed inner corner
+  } else {
+    ctx.fillRect(cx + 11 + lean, cy - 34, 6, 1);
+  }
+
+  // Eye
   if (!blink) {
     ctx.fillStyle = "#1a0e08";
-    ctx.fillRect(cx + 11, cy - 21, 3, 2);
+    ctx.fillRect(cx + 13 + lean, cy - 32, 3, 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(cx + 15 + lean, cy - 32, 1, 1);
   }
-  ctx.fillStyle = "#a06040";
-  ctx.fillRect(cx + 6, cy - 15, 6, 2);
-  ctx.fillStyle = "#3a2008";
-  ctx.fillRect(cx, cy - 29, 20, 4);
-  ctx.fillStyle = "#2a1408";
-  ctx.fillRect(cx + 3, cy - 40, 14, 13);
-  ctx.fillStyle = "#5a3010";
-  ctx.fillRect(cx + 3, cy - 40, 14, 3);
-  ctx.fillRect(cx + 2, cy - 30, 16, 3);
-  ctx.fillStyle = "#c84020";
-  ctx.fillRect(cx + 14, cy - 42, 2, 8);
-  ctx.fillStyle = "#e06030";
-  ctx.fillRect(cx + 15, cy - 42, 1, 6);
 
-  // Rod
-  const rodBaseX = cx + 24,
-    rodBaseY = cy - 10;
-  const rodTipX = cx + 24 + 90,
-    rodTipY = cy - 10 - 52;
-  ctx.strokeStyle = "#2a1008";
+  // Mouth
+  ctx.fillStyle = "#a06040";
+  if (isBiting) {
+    ctx.fillRect(cx + 11 + lean, cy - 28, 5, 1); // tense
+  } else {
+    ctx.fillRect(cx + 11 + lean, cy - 28, 4, 2); // relaxed
+  }
+
+  // Hat brim
+  ctx.fillStyle = "#2a1608";
+  ctx.fillRect(cx - 1 + lean, cy - 41, 24, 3);
+  ctx.fillStyle = "#3e2210";
+  ctx.fillRect(cx - 1 + lean, cy - 41, 6, 3);
+
+  // Hat crown
+  ctx.fillStyle = "#1e1008";
+  ctx.fillRect(cx + 3 + lean, cy - 55, 14, 15);
+  ctx.fillStyle = "#321c10";
+  ctx.fillRect(cx + 3 + lean, cy - 55, 3, 15);
+  ctx.fillStyle = "#281408";
+  ctx.fillRect(cx + 3 + lean, cy - 55, 14, 3);
+
+  // Hat band + lure
+  ctx.fillStyle = "#c83020";
+  ctx.fillRect(cx + 3 + lean, cy - 43, 14, 3);
+  ctx.fillStyle = "#e04030";
+  ctx.fillRect(cx + 4 + lean, cy - 43, 3, 3);
+  ctx.fillStyle = "#60c040"; // lure body
+  ctx.fillRect(cx + 15 + lean, cy - 44, 2, 2);
+  ctx.fillStyle = "#c8c040"; // lure shine
+  ctx.fillRect(cx + 16 + lean, cy - 43, 1, 1);
+
+  // Right arm — sleeve follows the rod angle toward the grip point
+  const gripLen = 18;
+  const gripX = pr(rodBaseX + Math.cos(rodAngle) * gripLen);
+  const gripY = pr(rodBaseY + Math.sin(rodAngle) * gripLen);
+  ctx.strokeStyle = "#3a5c30";
+  ctx.lineWidth = 6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx + 21 + lean, cy - 18); // shoulder
+  ctx.lineTo(gripX, gripY);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.fillStyle = "#c8906a"; // hand
+  ctx.fillRect(gripX - 3, gripY - 3, 6, 6);
+
+  // Rod — three passes: dark outline, wood tone, lighter tip
+  ctx.strokeStyle = "#1a0808";
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(rodBaseX, rodBaseY);
@@ -357,16 +465,22 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, frame: number) {
   ctx.moveTo(rodBaseX, rodBaseY);
   ctx.lineTo(rodTipX, rodTipY);
   ctx.stroke();
+  const midX = pr(rodBaseX + Math.cos(rodAngle) * rodLen * 0.35);
+  const midY = pr(rodBaseY + Math.sin(rodAngle) * rodLen * 0.35);
   ctx.strokeStyle = "#c09040";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(rodBaseX, rodBaseY);
+  ctx.moveTo(midX, midY);
   ctx.lineTo(rodTipX, rodTipY);
   ctx.stroke();
 }
 
-export function getRodTip() {
-  return { x: CHAR_X + 24 + 90, y: DOCK_Y - 2 - 10 - 52 };
+export function getRodTip(gameState: string, castProgress: number) {
+  const angle = getRodAngle(gameState, castProgress);
+  return {
+    x: pr(CHAR_X + 22 + Math.cos(angle) * 106),
+    y: pr(DOCK_Y - 12 + Math.sin(angle) * 106),
+  };
 }
 
 // ─── Line & Bobber ───────────────────────────────────────────────────────────
@@ -381,7 +495,7 @@ export function drawLine(
   biteTimer: number
 ) {
   if (gameState === "idle") return;
-  const tip = getRodTip();
+  const tip = getRodTip(gameState, castProgress);
 
   if (gameState === "casting") {
     const t = castProgress;

@@ -271,7 +271,7 @@ export function useFishingGame(
       drawGround(ctx!);
       drawDock(ctx!);
       drawParticles(ctx!, anim.particles);
-      drawCharacter(ctx!, anim.frame);
+      drawCharacter(ctx!, anim.frame, anim.gameState, anim.castProgress);
       drawLine(
         ctx!,
         anim.gameState,
