@@ -25,6 +25,7 @@ import {
   CANVAS_HEIGHT,
   WATER_Y,
 } from "../lib/constants";
+import { initAudio, playSplash, playBite, playCatch, playMiss } from "../lib/audio";
 
 const SPLASH_COLS = ["#5ba3dc", "#7ecfb3", "#aaddff"];
 const CATCH_COLS = ["#5ba3dc", "#7ecfb3", "#fff", "#f0c030"];
@@ -89,11 +90,14 @@ export function useFishingGame(
 
   const doReel = useCallback(() => {
     const anim = animRef.current;
+    // Unlock AudioContext on first user gesture (browser autoplay policy)
+    initAudio();
     // Actions are stable in Zustand v5 — safe to read from getState() without subscribing
     const { addCatch, setMessage, setStateLabel } = useFishingStore.getState();
 
     if (anim.gameState === "biting") {
       const fish = anim.currentFish!;
+      playCatch();
       addCatch(fish);
       if (anim.bobber) {
         spawnParticles(anim.bobber.x, anim.bobber.y, 28, CATCH_COLS, true, anim.particles);
@@ -176,6 +180,7 @@ export function useFishingGame(
           anim.currentFish = fish;
           anim.waitTimer = rnd(fish.wMin, fish.wMax);
           anim.gameState = "waiting";
+          playSplash();
           const { setMessage, setStateLabel } = useFishingStore.getState();
           setStateLabel("waiting...");
           setMessage("Bobber in. Wait for the bite...");
@@ -191,6 +196,7 @@ export function useFishingGame(
           anim.bitePhase = 0;
           if (anim.bobber)
             spawnParticles(anim.bobber.x, anim.bobber.y, 14, SPLASH_COLS, true, anim.particles);
+          playBite();
           const { setMessage, setStateLabel } = useFishingStore.getState();
           setStateLabel("BITE! click now!");
           setMessage("Fish on the line! Click fast!", anim.currentFish?.col);
@@ -221,6 +227,7 @@ export function useFishingGame(
           anim.bobber = null;
           anim.gameState = "idle";
           anim.currentFish = null;
+          playMiss();
           const { setMessage, setStateLabel } = useFishingStore.getState();
           setMessage("The fish got away! Try again.", "#e05030");
           setStateLabel("click or space to cast");
