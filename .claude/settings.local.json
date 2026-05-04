@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" install -g npm@latest 2>&1)",
+      "PowerShell(npm *)"
+    ]
+  }
+}
