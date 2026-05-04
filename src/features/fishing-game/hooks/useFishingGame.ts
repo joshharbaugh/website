@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useFishingStore } from "../store/useFishingStore";
-import type { GameState, Bobber, CatchAnimation } from "../store/useFishingStore";
+import type {
+  GameState,
+  Bobber,
+  CatchAnimation,
+} from "../store/useFishingStore";
 import { Particle, spawnParticles, updateParticles } from "../lib/particles";
 import {
   drawSky,
@@ -25,7 +29,13 @@ import {
   CANVAS_HEIGHT,
   WATER_Y,
 } from "../lib/constants";
-import { initAudio, playSplash, playBite, playCatch, playMiss } from "../lib/audio";
+import {
+  initAudio,
+  playSplash,
+  playBite,
+  playCatch,
+  playMiss,
+} from "../lib/audio";
 
 const SPLASH_COLS = ["#5ba3dc", "#7ecfb3", "#aaddff"];
 const CATCH_COLS = ["#5ba3dc", "#7ecfb3", "#fff", "#f0c030"];
@@ -100,7 +110,14 @@ export function useFishingGame(
       playCatch();
       addCatch(fish);
       if (anim.bobber) {
-        spawnParticles(anim.bobber.x, anim.bobber.y, 28, CATCH_COLS, true, anim.particles);
+        spawnParticles(
+          anim.bobber.x,
+          anim.bobber.y,
+          28,
+          CATCH_COLS,
+          true,
+          anim.particles
+        );
         anim.catchAnimation = {
           fish,
           cx: anim.bobber.x,
@@ -188,14 +205,22 @@ export function useFishingGame(
       }
 
       if (anim.gameState === "waiting") {
-        if (anim.bobber) anim.bobber.y = anim.bobber.baseY + Math.sin(ts * 0.003) * 2.5;
+        if (anim.bobber)
+          anim.bobber.y = anim.bobber.baseY + Math.sin(ts * 0.003) * 2.5;
         anim.waitTimer -= dt;
         if (anim.waitTimer <= 0) {
           anim.gameState = "biting";
           anim.biteTimer = BITE_WINDOW_MS;
           anim.bitePhase = 0;
           if (anim.bobber)
-            spawnParticles(anim.bobber.x, anim.bobber.y, 14, SPLASH_COLS, true, anim.particles);
+            spawnParticles(
+              anim.bobber.x,
+              anim.bobber.y,
+              14,
+              SPLASH_COLS,
+              true,
+              anim.particles
+            );
           playBite();
           const { setMessage, setStateLabel } = useFishingStore.getState();
           setStateLabel("BITE! click now!");
@@ -210,7 +235,10 @@ export function useFishingGame(
             Math.abs(Math.sin(anim.bitePhase * anim.currentFish.spd)) *
             anim.currentFish.amp;
           anim.bobber.y = anim.bobber.baseY + dip;
-          if (dip > anim.currentFish.amp * 0.45 && Math.random() < 0.07 * (dt / 16)) {
+          if (
+            dip > anim.currentFish.amp * 0.45 &&
+            Math.random() < 0.07 * (dt / 16)
+          ) {
             spawnParticles(
               anim.bobber.x,
               anim.bobber.baseY + dip * 0.4,
