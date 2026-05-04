@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "PowerShell(node \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" install -g npm@latest 2>&1)",
-      "PowerShell(npm *)"
+      "PowerShell(npm *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Josh\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Josh-website\\\\fe41c56f-0d5a-4e02-aaae-6e075daad3db\\\\tasks\\\\bpuv2ch4e.output\" -Wait)",
+      "Bash(Select-String --line-buffered \"Error|error|Success|https://|failed|Ready|Deployed|inspect\")"
     ]
   }
 }
