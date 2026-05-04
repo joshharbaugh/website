@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useFishingStore } from "../store/useFishingStore";
+import type { GameState, Bobber, CatchAnimation } from "../store/useFishingStore";
 import { Particle, spawnParticles, updateParticles } from "../lib/particles";
 import {
   drawSky,
@@ -16,6 +17,7 @@ import {
 } from "../lib/draw";
 import {
   FISH_TYPES,
+  FishType,
   pickFish,
   rnd,
   BITE_WINDOW_MS,
@@ -28,6 +30,7 @@ const SPLASH_COLS = ["#5ba3dc", "#7ecfb3", "#aaddff"];
 const CATCH_COLS = ["#5ba3dc", "#7ecfb3", "#fff", "#f0c030"];
 
 interface AnimState {
+  // Ambient / visual
   frame: number;
   waterAnim: number;
   stars: { x: number; y: number; s: number; p: number }[];
@@ -35,16 +38,21 @@ interface AnimState {
   bgFish: { x: number; y: number; d: number; t: number; fi: number }[];
   particles: Particle[];
   lastTime: number;
+  // Hot-path game state — mutated directly in the RAF loop, never written to Zustand
+  gameState: GameState;
+  castProgress: number;
+  bobber: Bobber | null;
+  currentFish: FishType | null;
+  waitTimer: number;
+  biteTimer: number;
+  bitePhase: number;
+  missFlash: number;
+  catchAnimation: CatchAnimation | null;
 }
 
 export function useFishingGame(
   canvasRef: React.RefObject<HTMLCanvasElement | null>
 ) {
-  const store = useFishingStore();
-  const storeRef = useRef(store);
-  storeRef.current = store;
-
-  // Mutable anim state — lives outside React to avoid triggering re-renders
   const animRef = useRef<AnimState>({
     frame: 0,
     waterAnim: 0,
@@ -66,51 +74,54 @@ export function useFishingGame(
     ],
     particles: [],
     lastTime: 0,
+    gameState: "idle",
+    castProgress: 0,
+    bobber: null,
+    currentFish: null,
+    waitTimer: 0,
+    biteTimer: 0,
+    bitePhase: 0,
+    missFlash: 0,
+    catchAnimation: null,
   });
 
   const rafRef = useRef<number | null>(null);
 
   const doReel = useCallback(() => {
-    const s = storeRef.current;
+    const anim = animRef.current;
+    // Actions are stable in Zustand v5 — safe to read from getState() without subscribing
+    const { addCatch, setMessage, setStateLabel } = useFishingStore.getState();
 
-    if (s.gameState === "biting") {
-      const fish = s.currentFish!;
-      s.addCatch(fish);
-      if (s.bobber) {
-        spawnParticles(
-          s.bobber.x,
-          s.bobber.y,
-          28,
-          CATCH_COLS,
-          true,
-          animRef.current.particles
-        );
-        s.setCatchAnimation({
+    if (anim.gameState === "biting") {
+      const fish = anim.currentFish!;
+      addCatch(fish);
+      if (anim.bobber) {
+        spawnParticles(anim.bobber.x, anim.bobber.y, 28, CATCH_COLS, true, anim.particles);
+        anim.catchAnimation = {
           fish,
-          cx: s.bobber.x,
-          cy: s.bobber.y,
-          sx: s.bobber.x,
-          sy: s.bobber.y,
+          cx: anim.bobber.x,
+          cy: anim.bobber.y,
+          sx: anim.bobber.x,
+          sy: anim.bobber.y,
           t: 0,
           phase: 0,
-        });
+        };
       }
-      s.setMessage(`${fish.label} ${fish.name} caught! +${fish.pts}`, fish.col);
-      s.setStateLabel("click or space to cast");
-      s.setBobber(null);
-      s.setGameState("idle");
-      s.setBiteTimer(0);
-    } else if (s.gameState === "waiting") {
-      s.setMessage("Nothing biting yet... patience!");
-    } else if (s.gameState === "idle") {
-      s.setGameState("casting");
-      s.setCastProgress(0);
-      s.setStateLabel("casting...");
-      s.setMessage("Line in the air!");
+      setMessage(`${fish.label} ${fish.name} caught! +${fish.pts}`, fish.col);
+      setStateLabel("click or space to cast");
+      anim.bobber = null;
+      anim.biteTimer = 0;
+      anim.gameState = "idle";
+    } else if (anim.gameState === "waiting") {
+      setMessage("Nothing biting yet... patience!");
+    } else if (anim.gameState === "idle") {
+      anim.gameState = "casting";
+      anim.castProgress = 0;
+      setStateLabel("casting...");
+      setMessage("Line in the air!");
     }
   }, []);
 
-  // Input listeners
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Space") {
@@ -128,7 +139,6 @@ export function useFishingGame(
     };
   }, [canvasRef, doReel]);
 
-  // RAF game loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -137,7 +147,6 @@ export function useFishingGame(
 
     function loop(ts: number) {
       const anim = animRef.current;
-      const s = storeRef.current;
       const dt = Math.min(ts - anim.lastTime, 100);
       anim.lastTime = ts;
       anim.frame++;
@@ -155,66 +164,50 @@ export function useFishingGame(
       }
       anim.particles = updateParticles(anim.particles, dt);
 
-      // State transitions
-      if (s.gameState === "casting") {
-        const next = s.castProgress + dt * 0.0015;
-        if (next >= 1) {
+      // State machine — only Zustand writes are the setMessage/setStateLabel calls
+      // on transitions (a few times per game cycle), not per frame.
+      if (anim.gameState === "casting") {
+        anim.castProgress += dt * 0.0015;
+        if (anim.castProgress >= 1) {
           const bx = rnd(530, 635);
           const by = WATER_Y + rnd(8, 22);
           const fish = pickFish();
-          s.setBobber({ x: bx, y: by, baseY: by });
-          s.setCurrentFish(fish);
-          s.setWaitTimer(rnd(fish.wMin, fish.wMax));
-          s.setGameState("waiting");
-          s.setStateLabel("waiting...");
-          s.setMessage("Bobber in. Wait for the bite...");
-        } else {
-          s.setCastProgress(next);
+          anim.bobber = { x: bx, y: by, baseY: by };
+          anim.currentFish = fish;
+          anim.waitTimer = rnd(fish.wMin, fish.wMax);
+          anim.gameState = "waiting";
+          const { setMessage, setStateLabel } = useFishingStore.getState();
+          setStateLabel("waiting...");
+          setMessage("Bobber in. Wait for the bite...");
         }
       }
 
-      if (s.gameState === "waiting") {
-        const nextWait = s.waitTimer - dt;
-        if (s.bobber)
-          s.setBobber({
-            ...s.bobber,
-            y: s.bobber.baseY + Math.sin(ts * 0.003) * 2.5,
-          });
-        if (nextWait <= 0) {
-          s.setGameState("biting");
-          s.setBiteTimer(BITE_WINDOW_MS);
-          s.setBitePhase(0);
-          s.setStateLabel("BITE! click now!");
-          s.setMessage("Fish on the line! Click fast!", s.currentFish?.col);
-          if (s.bobber)
-            spawnParticles(
-              s.bobber.x,
-              s.bobber.y,
-              14,
-              SPLASH_COLS,
-              true,
-              anim.particles
-            );
-        } else {
-          s.setWaitTimer(nextWait);
+      if (anim.gameState === "waiting") {
+        if (anim.bobber) anim.bobber.y = anim.bobber.baseY + Math.sin(ts * 0.003) * 2.5;
+        anim.waitTimer -= dt;
+        if (anim.waitTimer <= 0) {
+          anim.gameState = "biting";
+          anim.biteTimer = BITE_WINDOW_MS;
+          anim.bitePhase = 0;
+          if (anim.bobber)
+            spawnParticles(anim.bobber.x, anim.bobber.y, 14, SPLASH_COLS, true, anim.particles);
+          const { setMessage, setStateLabel } = useFishingStore.getState();
+          setStateLabel("BITE! click now!");
+          setMessage("Fish on the line! Click fast!", anim.currentFish?.col);
         }
       }
 
-      if (s.gameState === "biting") {
-        const nextBite = s.biteTimer - dt;
-        const nextPhase = s.bitePhase + dt * 0.001;
-        if (s.bobber && s.currentFish) {
+      if (anim.gameState === "biting") {
+        anim.bitePhase += dt * 0.001;
+        if (anim.bobber && anim.currentFish) {
           const dip =
-            Math.abs(Math.sin(nextPhase * s.currentFish.spd)) *
-            s.currentFish.amp;
-          s.setBobber({ ...s.bobber, y: s.bobber.baseY + dip });
-          if (
-            dip > s.currentFish.amp * 0.45 &&
-            Math.random() < 0.07 * (dt / 16)
-          ) {
+            Math.abs(Math.sin(anim.bitePhase * anim.currentFish.spd)) *
+            anim.currentFish.amp;
+          anim.bobber.y = anim.bobber.baseY + dip;
+          if (dip > anim.currentFish.amp * 0.45 && Math.random() < 0.07 * (dt / 16)) {
             spawnParticles(
-              s.bobber.x,
-              s.bobber.baseY + dip * 0.4,
+              anim.bobber.x,
+              anim.bobber.baseY + dip * 0.4,
               2,
               SPLASH_COLS,
               true,
@@ -222,25 +215,19 @@ export function useFishingGame(
             );
           }
         }
-        s.setBitePhase(nextPhase);
-        if (nextBite <= 0) {
-          s.setMissFlash(500);
-          s.setMessage("The fish got away! Try again.", "#e05030");
-          s.setStateLabel("click or space to cast");
-          s.setBobber(null);
-          s.setGameState("idle");
-          s.setCurrentFish(null);
-        } else {
-          s.setBiteTimer(nextBite);
+        anim.biteTimer -= dt;
+        if (anim.biteTimer <= 0) {
+          anim.missFlash = 500;
+          anim.bobber = null;
+          anim.gameState = "idle";
+          anim.currentFish = null;
+          const { setMessage, setStateLabel } = useFishingStore.getState();
+          setMessage("The fish got away! Try again.", "#e05030");
+          setStateLabel("click or space to cast");
         }
       }
 
-      if (s.missFlash > 0) s.setMissFlash(s.missFlash - dt);
-
-      // Update catch animation
-      if (s.catchAnimation) {
-        s.setCatchAnimation(s.catchAnimation); // trigger read in draw
-      }
+      if (anim.missFlash > 0) anim.missFlash -= dt;
 
       // Draw
       ctx!.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -252,20 +239,19 @@ export function useFishingGame(
       drawCharacter(ctx!, anim.frame);
       drawLine(
         ctx!,
-        s.gameState,
-        s.castProgress,
-        s.bobber,
-        s.currentFish,
-        s.bitePhase,
-        s.biteTimer
+        anim.gameState,
+        anim.castProgress,
+        anim.bobber,
+        anim.currentFish,
+        anim.bitePhase,
+        anim.biteTimer
       );
 
-      if (s.catchAnimation) {
-        const next = drawCatchAnimation(ctx!, s.catchAnimation);
-        if (next !== s.catchAnimation) s.setCatchAnimation(next);
+      if (anim.catchAnimation) {
+        anim.catchAnimation = drawCatchAnimation(ctx!, anim.catchAnimation);
       }
 
-      drawMissFlash(ctx!, s.missFlash);
+      drawMissFlash(ctx!, anim.missFlash);
 
       rafRef.current = requestAnimationFrame(loop);
     }
