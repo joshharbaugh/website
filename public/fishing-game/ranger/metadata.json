@@ -175,9 +175,21 @@
           "animations/animating-73714f41/east/frame_003.png",
           "animations/animating-73714f41/east/frame_004.png"
         ]
+      },
+      "animating-488961f6": {
+        "west": [
+          "animations/animating-488961f6/west/frame_000.png",
+          "animations/animating-488961f6/west/frame_001.png",
+          "animations/animating-488961f6/west/frame_002.png",
+          "animations/animating-488961f6/west/frame_003.png",
+          "animations/animating-488961f6/west/frame_004.png",
+          "animations/animating-488961f6/west/frame_005.png",
+          "animations/animating-488961f6/west/frame_006.png",
+          "animations/animating-488961f6/west/frame_007.png"
+        ]
       }
     }
   },
   "export_version": "2.0",
-  "export_date": "2026-05-05T01:03:42.985068"
+  "export_date": "2026-05-05T02:03:34.513542"
 }

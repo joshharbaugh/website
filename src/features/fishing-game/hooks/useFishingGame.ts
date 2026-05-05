@@ -61,6 +61,7 @@ interface AnimState {
   catchAnimation: CatchAnimation | null;
   sprites: {
     idle: (HTMLImageElement | null)[];
+    fishingIdle: (HTMLImageElement | null)[];
     cast: (HTMLImageElement | null)[];
     catch: (HTMLImageElement | null)[];
   };
@@ -101,6 +102,7 @@ export function useFishingGame(
     catchAnimation: null,
     sprites: {
       idle: [null, null, null, null],
+      fishingIdle: [null, null, null, null, null, null, null, null],
       cast: [null, null, null, null, null, null, null],
       catch: [null, null, null, null, null],
     },
@@ -183,9 +185,10 @@ export function useFishingGame(
       });
     };
     const s = animRef.current.sprites;
-    loadFrames("animating-3275cf01", s.idle); // breathing-idle
-    loadFrames("animating-74fb7b4e", s.cast); // throw-object (cast)
-    loadFrames("animating-73714f41", s.catch); // picking-up (catch)
+    loadFrames("animating-3275cf01", s.idle);        // breathing-idle
+    loadFrames("animating-488961f6", s.fishingIdle); // fight-stance-idle (waiting/biting)
+    loadFrames("animating-74fb7b4e", s.cast);        // throw-object (cast)
+    loadFrames("animating-73714f41", s.catch);       // picking-up (catch)
   }, []);
 
   useEffect(() => {
@@ -310,11 +313,14 @@ export function useFishingGame(
         anim.frame,
         anim.gameState,
         anim.sprites.idle,
+        anim.sprites.fishingIdle,
         anim.sprites.cast,
         anim.sprites.catch,
         anim.castProgress,
         catchFrame
       );
+      const isWaiting = anim.gameState === "waiting" || anim.gameState === "biting";
+      const lineJitter = isWaiting ? Math.sin(ts * 0.006) * 5 : 0;
       drawLine(
         ctx!,
         anim.gameState,
@@ -322,7 +328,8 @@ export function useFishingGame(
         anim.bobber,
         anim.currentFish,
         anim.bitePhase,
-        anim.biteTimer
+        anim.biteTimer,
+        lineJitter
       );
 
       if (anim.catchAnimation) {

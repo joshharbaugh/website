@@ -294,25 +294,20 @@ const SPRITE_Y = DOCK_Y - 112; // 62 — character feet at ~56px in source × 2
 
 // Pixel offset from sprite origin to the rod tip (at SPRITE_SCALE).
 // Tune after visual inspection — the fishing line anchors here.
-const ROD_TIP_OX = 52; // west-facing: rod extends left, tip near left edge
-const ROD_TIP_OY = 8;
+const ROD_TIP_OX = 32; // west-facing: rod extends left, tip near left edge
+const ROD_TIP_OY = 50;
 
 export function drawCharacter(
   ctx: CanvasRenderingContext2D,
   frame: number,
   gameState: string,
   idleFrames: (HTMLImageElement | null)[],
+  fishingIdleFrames: (HTMLImageElement | null)[],
   castFrames: (HTMLImageElement | null)[],
   catchFrames: (HTMLImageElement | null)[],
   castProgress: number,
   catchFrameIdx: number
 ) {
-  // Shadow
-  ctx.fillStyle = "#00000048";
-  ctx.beginPath();
-  ctx.ellipse(SPRITE_X + SPRITE_W / 2, DOCK_Y + 14, 14, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-
   let frames: (HTMLImageElement | null)[];
   let frameIdx: number;
 
@@ -326,6 +321,9 @@ export function drawCharacter(
       Math.floor(eased * castFrames.length),
       castFrames.length - 1
     );
+  } else if (gameState === "waiting" || gameState === "biting") {
+    frames = fishingIdleFrames;
+    frameIdx = Math.floor(frame / 15) % Math.max(fishingIdleFrames.length, 1);
   } else {
     frames = idleFrames;
     frameIdx = Math.floor(frame / 30) % Math.max(idleFrames.length, 1);
@@ -361,7 +359,8 @@ export function drawLine(
   bobber: Bobber | null,
   currentFish: FishType | null,
   bitePhase: number,
-  biteTimer: number
+  biteTimer: number,
+  lineJitter: number
 ) {
   if (gameState === "idle") return;
   const tip = getRodTip();
@@ -385,7 +384,7 @@ export function drawLine(
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(tip.x, tip.y);
-  ctx.quadraticCurveTo(tip.x - 50, tip.y + 40, bobber.x, bobber.y);
+  ctx.quadraticCurveTo(tip.x - 50, tip.y + 40 + lineJitter, bobber.x, bobber.y);
   ctx.stroke();
 
   const biting = gameState === "biting";
