@@ -59,7 +59,11 @@ interface AnimState {
   bitePhase: number;
   missFlash: number;
   catchAnimation: CatchAnimation | null;
-  sprites: { idle: HTMLImageElement | null; catchSprite: HTMLImageElement | null };
+  sprites: {
+    idle: (HTMLImageElement | null)[];
+    cast: (HTMLImageElement | null)[];
+    catch: (HTMLImageElement | null)[];
+  };
 }
 
 export function useFishingGame(
@@ -95,7 +99,11 @@ export function useFishingGame(
     bitePhase: 0,
     missFlash: 0,
     catchAnimation: null,
-    sprites: { idle: null, catchSprite: null },
+    sprites: {
+      idle: [null, null, null, null],
+      cast: [null, null, null, null, null, null, null],
+      catch: [null, null, null, null, null],
+    },
   });
 
   const rafRef = useRef<number | null>(null);
@@ -163,15 +171,21 @@ export function useFishingGame(
   }, [canvasRef, doReel]);
 
   useEffect(() => {
-    const load = (src: string, key: "idle" | "catchSprite") => {
-      const img = new Image();
-      img.onload = () => {
-        animRef.current.sprites[key] = img;
-      };
-      img.src = src;
+    const BASE = "/fishing-game/ranger/animations";
+    const loadFrames = (dir: string, arr: (HTMLImageElement | null)[]) => {
+      arr.forEach((_, i) => {
+        const img = new Image();
+        const idx = String(i).padStart(3, "0");
+        img.onload = () => {
+          arr[i] = img;
+        };
+        img.src = `${BASE}/${dir}/west/frame_${idx}.png`;
+      });
     };
-    load("/fishing-game/character.png", "idle");
-    load("/fishing-game/character-catch.png", "catchSprite");
+    const s = animRef.current.sprites;
+    loadFrames("animating-3275cf01", s.idle); // breathing-idle
+    loadFrames("animating-74fb7b4e", s.cast); // throw-object (cast)
+    loadFrames("animating-73714f41", s.catch); // picking-up (catch)
   }, []);
 
   useEffect(() => {
@@ -204,7 +218,7 @@ export function useFishingGame(
       if (anim.gameState === "casting") {
         anim.castProgress += dt * 0.0015;
         if (anim.castProgress >= 1) {
-          const bx = rnd(530, 635);
+          const bx = rnd(50, 250);
           const by = WATER_Y + rnd(8, 22);
           const fish = pickFish();
           anim.bobber = { x: bx, y: by, baseY: by };
@@ -289,14 +303,16 @@ export function useFishingGame(
       if (anim.catchAnimation) {
         const { phase, t } = anim.catchAnimation;
         const totalT = phase === 0 ? t : phase === 1 ? 20 + t : 48 + t;
-        catchFrame = Math.min(Math.floor(totalT / 10), 5);
+        catchFrame = Math.min(Math.floor(totalT / 12), 4); // 5 frames (0-4)
       }
       drawCharacter(
         ctx!,
         anim.frame,
         anim.gameState,
         anim.sprites.idle,
-        anim.sprites.catchSprite,
+        anim.sprites.cast,
+        anim.sprites.catch,
+        anim.castProgress,
         catchFrame
       );
       drawLine(

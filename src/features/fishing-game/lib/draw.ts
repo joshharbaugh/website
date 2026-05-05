@@ -280,29 +280,32 @@ export function drawDock(ctx: CanvasRenderingContext2D) {
 
 // ─── Character ───────────────────────────────────────────────────────────────
 
-// Sprite sheet layout: horizontal strip of 48×48 frames.
-//   public/fishing-game/character.png       — 4-frame idle/fishing loop
-//   public/fishing-game/character-catch.png — 6-frame catch celebration
+// PixelLab ranger sprite: individual 68×68 PNG frames per animation×direction.
+//   public/fishing-game/ranger/animations/animating-3275cf01/east/ — 4-frame breathing-idle
+//   public/fishing-game/ranger/animations/animating-74fb7b4e/east/ — 7-frame throw-object (cast)
+//   public/fishing-game/ranger/animations/animating-73714f41/east/ — 5-frame picking-up (catch)
+const SRC_SIZE = 68;
 const SPRITE_SCALE = 2;
-const SPRITE_W = 48 * SPRITE_SCALE; // 96
-const SPRITE_H = 48 * SPRITE_SCALE; // 96
-// Top-left corner of the rendered sprite. Tune so the character stands on
-// the dock surface (DOCK_Y = 174).
-const SPRITE_X = CHAR_X - 20; // 368
-const SPRITE_Y = DOCK_Y - SPRITE_H + 8; // 86
+const SPRITE_W = SRC_SIZE * SPRITE_SCALE; // 136
+const SPRITE_H = SRC_SIZE * SPRITE_SCALE; // 136
+// Tune so the character stands on the dock surface (DOCK_Y = 174).
+const SPRITE_X = CHAR_X - 46; // 342
+const SPRITE_Y = DOCK_Y - 112; // 62 — character feet at ~56px in source × 2
 
 // Pixel offset from sprite origin to the rod tip (at SPRITE_SCALE).
-// Tune after dropping in artwork — the fishing line anchors here.
-const ROD_TIP_OX = 86;
-const ROD_TIP_OY = 18;
+// Tune after visual inspection — the fishing line anchors here.
+const ROD_TIP_OX = 52; // west-facing: rod extends left, tip near left edge
+const ROD_TIP_OY = 8;
 
 export function drawCharacter(
   ctx: CanvasRenderingContext2D,
   frame: number,
   gameState: string,
-  idleSprite: HTMLImageElement | null,
-  catchSprite: HTMLImageElement | null,
-  catchFrame: number
+  idleFrames: (HTMLImageElement | null)[],
+  castFrames: (HTMLImageElement | null)[],
+  catchFrames: (HTMLImageElement | null)[],
+  castProgress: number,
+  catchFrameIdx: number
 ) {
   // Shadow
   ctx.fillStyle = "#00000048";
@@ -310,26 +313,33 @@ export function drawCharacter(
   ctx.ellipse(SPRITE_X + SPRITE_W / 2, DOCK_Y + 14, 14, 3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const isCatching = catchFrame >= 0;
-  const sprite = isCatching ? catchSprite : idleSprite;
-  if (!sprite) return;
+  let frames: (HTMLImageElement | null)[];
+  let frameIdx: number;
 
-  let srcFrame: number;
-  if (isCatching) {
-    srcFrame = Math.min(catchFrame, 5);
+  if (catchFrameIdx >= 0) {
+    frames = catchFrames;
+    frameIdx = Math.min(catchFrameIdx, catchFrames.length - 1);
   } else if (gameState === "casting") {
-    srcFrame = 0; // no cast animation — hold frame 0
+    frames = castFrames;
+    frameIdx = Math.min(
+      Math.floor(castProgress * castFrames.length),
+      castFrames.length - 1
+    );
   } else {
-    srcFrame = Math.floor(frame / 15) % 4; // idle cycle ~4 fps at 60 fps
+    frames = idleFrames;
+    frameIdx = Math.floor(frame / 10) % Math.max(idleFrames.length, 1);
   }
+
+  const img = frames[frameIdx];
+  if (!img) return;
 
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
-    sprite,
-    srcFrame * 48,
+    img,
     0,
-    48,
-    48,
+    0,
+    SRC_SIZE,
+    SRC_SIZE,
     SPRITE_X,
     SPRITE_Y,
     SPRITE_W,
@@ -357,13 +367,13 @@ export function drawLine(
 
   if (gameState === "casting") {
     const t = castProgress;
-    const ex = tip.x + t * 185;
+    const ex = tip.x - t * 185;
     const ey = tip.y - Math.sin(t * Math.PI) * 70 + t * t * 140;
     ctx.strokeStyle = "#c8a060";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(tip.x, tip.y);
-    ctx.quadraticCurveTo(tip.x + t * 90, tip.y - 30, ex, ey);
+    ctx.quadraticCurveTo(tip.x - t * 90, tip.y - 30, ex, ey);
     ctx.stroke();
     drawBobber(ctx, ex, ey, null, false);
     return;
@@ -374,7 +384,7 @@ export function drawLine(
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(tip.x, tip.y);
-  ctx.quadraticCurveTo(tip.x + 50, tip.y + 40, bobber.x, bobber.y);
+  ctx.quadraticCurveTo(tip.x - 50, tip.y + 40, bobber.x, bobber.y);
   ctx.stroke();
 
   const biting = gameState === "biting";
