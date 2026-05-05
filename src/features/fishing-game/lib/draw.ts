@@ -426,7 +426,7 @@ export function drawCharacter(
     frameIdx = Math.floor(frame / 15) % Math.max(fishingIdleFrames.length, 1);
   } else {
     frames = idleFrames;
-    frameIdx = Math.floor(frame / 30) % Math.max(idleFrames.length, 1);
+    frameIdx = Math.floor(frame / 60) % Math.max(idleFrames.length, 1);
   }
 
   const img = frames[frameIdx];
