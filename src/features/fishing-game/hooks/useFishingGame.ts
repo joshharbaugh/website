@@ -65,6 +65,7 @@ interface AnimState {
     cast: (HTMLImageElement | null)[];
     catch: (HTMLImageElement | null)[];
   };
+  fishSprites: (HTMLImageElement | null)[];
 }
 
 export function useFishingGame(
@@ -106,6 +107,7 @@ export function useFishingGame(
       cast: [null, null, null, null, null, null, null],
       catch: [null, null, null, null, null],
     },
+    fishSprites: [null, null, null, null, null],
   });
 
   const rafRef = useRef<number | null>(null);
@@ -189,6 +191,18 @@ export function useFishingGame(
     loadFrames("animating-488961f6", s.fishingIdle); // fight-stance-idle (waiting/biting)
     loadFrames("animating-74fb7b4e", s.cast);        // throw-object (cast)
     loadFrames("animating-73714f41", s.catch);       // picking-up (catch)
+  }, []);
+
+  useEffect(() => {
+    const FISH_NAMES = ["perch", "bass", "trout", "catfish", "pike"];
+    const fs = animRef.current.fishSprites;
+    FISH_NAMES.forEach((name, tier) => {
+      const img = new Image();
+      img.onload = () => {
+        fs[tier] = img;
+      };
+      img.src = `/fishing-game/fish/${name}.png`;
+    });
   }, []);
 
   useEffect(() => {
@@ -298,7 +312,7 @@ export function useFishingGame(
       // Draw
       ctx!.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       drawSky(ctx!, anim.frame, anim.stars, anim.clouds);
-      drawWater(ctx!, anim.waterAnim, anim.bgFish, FISH_TYPES);
+      drawWater(ctx!, anim.waterAnim, anim.bgFish, FISH_TYPES, anim.fishSprites);
       drawGround(ctx!);
       drawDock(ctx!);
       drawParticles(ctx!, anim.particles);
@@ -333,7 +347,7 @@ export function useFishingGame(
       );
 
       if (anim.catchAnimation) {
-        anim.catchAnimation = drawCatchAnimation(ctx!, anim.catchAnimation);
+        anim.catchAnimation = drawCatchAnimation(ctx!, anim.catchAnimation, anim.fishSprites);
       }
 
       drawMissFlash(ctx!, anim.missFlash);

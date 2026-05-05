@@ -140,7 +140,8 @@ export function drawWater(
   ctx: CanvasRenderingContext2D,
   waterAnim: number,
   bgFish: BgFish[],
-  fishTypes: FishType[]
+  fishTypes: FishType[],
+  fishSprites: (HTMLImageElement | null)[]
 ) {
   ctx.fillStyle = "#0c1c30";
   ctx.fillRect(0, WATER_Y, W, H - WATER_Y);
@@ -170,14 +171,8 @@ export function drawWater(
   for (const f of bgFish) {
     const fx = f.x + Math.sin(f.t * 0.05) * 5;
     const fy = f.y + Math.sin(f.t * 0.09) * 2;
-    drawFish(
-      ctx,
-      pr(fx),
-      pr(fy),
-      f.d,
-      fishTypes[f.fi % fishTypes.length],
-      0.55
-    );
+    const ft = fishTypes[f.fi % fishTypes.length];
+    drawFish(ctx, pr(fx), pr(fy), f.d, ft, 0.55, fishSprites[ft.tier], f.t);
   }
 }
 
@@ -479,9 +474,27 @@ export function drawFish(
   y: number,
   d: number,
   fish: FishType,
-  alpha: number = 1
+  alpha: number = 1,
+  sprite?: HTMLImageElement | null,
+  swimT: number = 0,
+  renderSize: number = 48
 ) {
   ctx.globalAlpha = alpha;
+
+  if (sprite) {
+    const scaleY = 1 + Math.sin(swimT * 0.12) * 0.05;
+    const hw = renderSize / 2;
+    const hh = (renderSize * scaleY) / 2;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(x, y);
+    if (d === -1) ctx.scale(-1, 1);
+    ctx.drawImage(sprite, 0, 0, 48, 48, -hw, -hh, renderSize, renderSize * scaleY);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    return;
+  }
+
   const c1 = fish.col,
     outline = "#0a0808";
 
@@ -598,16 +611,18 @@ export function drawFish(
 
 export function drawCatchAnimation(
   ctx: CanvasRenderingContext2D,
-  anim: CatchAnimation
+  anim: CatchAnimation,
+  fishSprites: (HTMLImageElement | null)[]
 ): CatchAnimation | null {
   const a = { ...anim, t: anim.t + 1 };
   const fish = a.fish;
+  const sprite = fishSprites[fish.tier] ?? null;
 
   if (a.phase === 0) {
     const prog = Math.min(a.t / 20, 1);
     const fy = a.sy - prog * prog * 70;
     const next = { ...a, cy: fy };
-    drawFish(ctx, pr(a.cx), pr(fy), 1, fish, 1);
+    drawFish(ctx, pr(a.cx), pr(fy), 1, fish, 1, sprite, a.t, sprite ? 120 : undefined);
     if (a.t >= 20) return { ...next, phase: 1, t: 0 };
     return next;
   }
@@ -624,24 +639,26 @@ export function drawCatchAnimation(
       }
       ctx.globalAlpha = 1;
     }
-    drawFish(ctx, pr(a.cx), pr(a.cy), 1, fish, 1);
+    drawFish(ctx, pr(a.cx), pr(a.cy), 1, fish, 1, sprite, a.t, sprite ? 120 : undefined);
+    const labelYBase = sprite ? a.cy - 76 : a.cy - 32;
+    const ptsYBase = sprite ? a.cy - 64 : a.cy - 20;
     ctx.font = "bold 11px monospace";
     ctx.textAlign = "center";
     ctx.fillStyle = "#000000a0";
-    ctx.fillText(fish.label + "!", a.cx + 1, a.cy - 31);
+    ctx.fillText(fish.label + "!", a.cx + 1, labelYBase + 1);
     ctx.fillStyle = fish.col;
-    ctx.fillText(fish.label + "!", a.cx, a.cy - 32);
+    ctx.fillText(fish.label + "!", a.cx, labelYBase);
     ctx.fillStyle = "#000000a0";
-    ctx.fillText("+" + fish.pts, a.cx + 1, a.cy - 19);
+    ctx.fillText("+" + fish.pts, a.cx + 1, ptsYBase + 1);
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("+" + fish.pts, a.cx, a.cy - 20);
+    ctx.fillText("+" + fish.pts, a.cx, ptsYBase);
     ctx.textAlign = "left";
     if (a.t >= 28) return { ...a, phase: 2, t: 0 };
     return a;
   }
 
   // Phase 2 — fade out
-  drawFish(ctx, pr(a.cx), pr(a.cy), 1, fish, Math.max(0, 1 - a.t / 14));
+  drawFish(ctx, pr(a.cx), pr(a.cy), 1, fish, Math.max(0, 1 - a.t / 14), sprite, a.t, sprite ? 120 : undefined);
   if (a.t >= 14) return null;
   return a;
 }

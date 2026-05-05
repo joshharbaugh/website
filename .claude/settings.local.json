@@ -11,7 +11,12 @@
       "mcp__pixellab__get_character",
       "mcp__pixellab__animate_character",
       "Bash(Get-ChildItem *)",
-      "PowerShell(Expand-Archive *)"
+      "PowerShell(Expand-Archive *)",
+      "mcp__pixellab__create_object",
+      "mcp__pixellab__get_object",
+      "mcp__pixellab__animate_object",
+      "WebFetch(domain:api.pixellab.ai)"
     ]
   }
 }
+
