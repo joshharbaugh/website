@@ -321,13 +321,14 @@ export function drawCharacter(
     frameIdx = Math.min(catchFrameIdx, catchFrames.length - 1);
   } else if (gameState === "casting") {
     frames = castFrames;
+    const eased = castProgress * castProgress * (3 - 2 * castProgress);
     frameIdx = Math.min(
-      Math.floor(castProgress * castFrames.length),
+      Math.floor(eased * castFrames.length),
       castFrames.length - 1
     );
   } else {
     frames = idleFrames;
-    frameIdx = Math.floor(frame / 10) % Math.max(idleFrames.length, 1);
+    frameIdx = Math.floor(frame / 30) % Math.max(idleFrames.length, 1);
   }
 
   const img = frames[frameIdx];

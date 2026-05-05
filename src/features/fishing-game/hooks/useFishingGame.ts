@@ -216,7 +216,7 @@ export function useFishingGame(
       // State machine — only Zustand writes are the setMessage/setStateLabel calls
       // on transitions (a few times per game cycle), not per frame.
       if (anim.gameState === "casting") {
-        anim.castProgress += dt * 0.0015;
+        anim.castProgress += dt * 0.00075;
         if (anim.castProgress >= 1) {
           const bx = rnd(50, 250);
           const by = WATER_Y + rnd(8, 22);
