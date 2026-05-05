@@ -2,8 +2,15 @@
 
 import { useFishingStore } from "../store/useFishingStore";
 
+const TOD_LABEL: Record<string, string> = { day: "DAY", dusk: "DUSK", night: "NIGHT" };
+const TOD_COLOR: Record<string, string> = {
+  day: "#f8c020",
+  dusk: "#f08030",
+  night: "#9070d0",
+};
+
 export function FishingHUD() {
-  const { score, caught, stateLabel, message, messageColor, catchLog } =
+  const { score, caught, stateLabel, message, messageColor, catchLog, timeOfDay, cycleTimeOfDay } =
     useFishingStore();
 
   return (
@@ -14,9 +21,18 @@ export function FishingHUD() {
           score: <b>{score}</b>
         </span>
         <span>{stateLabel}</span>
-        <span>
-          caught: <b>{caught}</b>
-        </span>
+        <div className="flex items-center gap-3">
+          <span>
+            caught: <b>{caught}</b>
+          </span>
+          <button
+            onClick={cycleTimeOfDay}
+            className="font-mono text-[10px] px-1.5 py-0.5 rounded border cursor-pointer transition-colors"
+            style={{ color: TOD_COLOR[timeOfDay], borderColor: `${TOD_COLOR[timeOfDay]}55` }}
+          >
+            {TOD_LABEL[timeOfDay]}
+          </button>
+        </div>
       </div>
 
       {/* Status message */}

@@ -9,6 +9,7 @@ import type {
 } from "../store/useFishingStore";
 import { Particle, spawnParticles, updateParticles } from "../lib/particles";
 import {
+  BgSprites,
   drawSky,
   drawWater,
   drawGround,
@@ -66,6 +67,7 @@ interface AnimState {
     catch: (HTMLImageElement | null)[];
   };
   fishSprites: (HTMLImageElement | null)[];
+  bgSprites: BgSprites;
 }
 
 export function useFishingGame(
@@ -108,6 +110,15 @@ export function useFishingGame(
       catch: [null, null, null, null, null],
     },
     fishSprites: [null, null, null, null, null],
+    bgSprites: {
+      dock: null,
+      treeTall: null,
+      treeShort: null,
+      cloudDay: null,
+      cloudDusk: null,
+      moon: null,
+      sun: null,
+    },
   });
 
   const rafRef = useRef<number | null>(null);
@@ -187,10 +198,10 @@ export function useFishingGame(
       });
     };
     const s = animRef.current.sprites;
-    loadFrames("animating-3275cf01", s.idle);        // breathing-idle
+    loadFrames("animating-3275cf01", s.idle); // breathing-idle
     loadFrames("animating-488961f6", s.fishingIdle); // fight-stance-idle (waiting/biting)
-    loadFrames("animating-74fb7b4e", s.cast);        // throw-object (cast)
-    loadFrames("animating-73714f41", s.catch);       // picking-up (catch)
+    loadFrames("animating-74fb7b4e", s.cast); // throw-object (cast)
+    loadFrames("animating-73714f41", s.catch); // picking-up (catch)
   }, []);
 
   useEffect(() => {
@@ -203,6 +214,24 @@ export function useFishingGame(
       };
       img.src = `/fishing-game/fish/${name}.png`;
     });
+  }, []);
+
+  useEffect(() => {
+    const bg = animRef.current.bgSprites;
+    const load = (key: keyof BgSprites, path: string) => {
+      const img = new Image();
+      img.onload = () => {
+        bg[key] = img;
+      };
+      img.src = path;
+    };
+    load("dock", "/fishing-game/bg/dock.png");
+    load("treeTall", "/fishing-game/bg/tree-tall.png");
+    load("treeShort", "/fishing-game/bg/tree-short.png");
+    load("cloudDay", "/fishing-game/bg/cloud-day.png");
+    load("cloudDusk", "/fishing-game/bg/cloud-dusk.png");
+    load("moon", "/fishing-game/bg/moon.png");
+    load("sun", "/fishing-game/bg/sun.png");
   }, []);
 
   useEffect(() => {
@@ -236,7 +265,7 @@ export function useFishingGame(
         anim.castProgress += dt * 0.00075;
         if (anim.castProgress >= 1) {
           const bx = rnd(50, 250);
-          const by = WATER_Y + rnd(8, 22);
+          const by = WATER_Y + rnd(27, 35);
           const fish = pickFish();
           anim.bobber = { x: bx, y: by, baseY: by };
           anim.currentFish = fish;
@@ -310,11 +339,26 @@ export function useFishingGame(
       if (anim.missFlash > 0) anim.missFlash -= dt;
 
       // Draw
+      const { timeOfDay } = useFishingStore.getState();
       ctx!.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      drawSky(ctx!, anim.frame, anim.stars, anim.clouds);
-      drawWater(ctx!, anim.waterAnim, anim.bgFish, FISH_TYPES, anim.fishSprites);
-      drawGround(ctx!);
-      drawDock(ctx!);
+      drawSky(
+        ctx!,
+        anim.frame,
+        anim.stars,
+        anim.clouds,
+        timeOfDay,
+        anim.bgSprites
+      );
+      drawWater(
+        ctx!,
+        anim.waterAnim,
+        anim.bgFish,
+        FISH_TYPES,
+        anim.fishSprites,
+        timeOfDay
+      );
+      drawGround(ctx!, timeOfDay);
+      drawDock(ctx!, anim.bgSprites.dock, timeOfDay);
       drawParticles(ctx!, anim.particles);
       let catchFrame = -1;
       if (anim.catchAnimation) {
@@ -333,7 +377,8 @@ export function useFishingGame(
         anim.castProgress,
         catchFrame
       );
-      const isWaiting = anim.gameState === "waiting" || anim.gameState === "biting";
+      const isWaiting =
+        anim.gameState === "waiting" || anim.gameState === "biting";
       const lineJitter = isWaiting ? Math.sin(ts * 0.006) * 5 : 0;
       drawLine(
         ctx!,
@@ -347,7 +392,11 @@ export function useFishingGame(
       );
 
       if (anim.catchAnimation) {
-        anim.catchAnimation = drawCatchAnimation(ctx!, anim.catchAnimation, anim.fishSprites);
+        anim.catchAnimation = drawCatchAnimation(
+          ctx!,
+          anim.catchAnimation,
+          anim.fishSprites
+        );
       }
 
       drawMissFlash(ctx!, anim.missFlash);

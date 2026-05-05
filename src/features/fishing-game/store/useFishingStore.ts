@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FishType } from "../lib/constants";
+import { FishType, TimeOfDay } from "../lib/constants";
 
 export type GameState = "idle" | "casting" | "waiting" | "biting";
 
@@ -35,9 +35,12 @@ interface FishingStore {
   messageColor: string;
   stateLabel: string;
 
+  timeOfDay: TimeOfDay;
+
   addCatch: (fish: FishType) => void;
   setMessage: (msg: string, color?: string) => void;
   setStateLabel: (label: string) => void;
+  cycleTimeOfDay: () => void;
   reset: () => void;
 }
 
@@ -50,6 +53,7 @@ const INITIAL_STATE = {
   message: "Welcome to Pixel Haven! Click or press Space to cast.",
   messageColor: "#c8a45a",
   stateLabel: "click or space to cast",
+  timeOfDay: "dusk" as TimeOfDay,
 };
 
 export const useFishingStore = create<FishingStore>((set) => ({
@@ -66,6 +70,16 @@ export const useFishingStore = create<FishingStore>((set) => ({
     set({ message, messageColor }),
 
   setStateLabel: (stateLabel) => set({ stateLabel }),
+
+  cycleTimeOfDay: () =>
+    set((state) => ({
+      timeOfDay:
+        state.timeOfDay === "day"
+          ? "dusk"
+          : state.timeOfDay === "dusk"
+            ? "night"
+            : "day",
+    })),
 
   reset: () => set(INITIAL_STATE),
 }));

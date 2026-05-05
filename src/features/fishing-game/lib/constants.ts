@@ -1,10 +1,12 @@
 export const CANVAS_WIDTH = 680;
 export const CANVAS_HEIGHT = 300;
-export const WATER_Y = 196;
-export const DOCK_Y = 174;
+export const WATER_Y = 200;
+export const DOCK_Y = 245;
 export const CHAR_X = 388;
 
 export const BITE_WINDOW_MS = 2500;
+
+export type TimeOfDay = "day" | "dusk" | "night";
 
 export type FishTier = 0 | 1 | 2 | 3 | 4;
 

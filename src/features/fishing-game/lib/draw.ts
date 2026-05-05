@@ -1,4 +1,4 @@
-import { FishType } from "./constants";
+import { FishType, TimeOfDay } from "./constants";
 import { Particle } from "./particles";
 import { CatchAnimation, Bobber } from "../store/useFishingStore";
 import {
@@ -8,6 +8,16 @@ import {
   CANVAS_WIDTH as W,
   CANVAS_HEIGHT as H,
 } from "./constants";
+
+export interface BgSprites {
+  dock: HTMLImageElement | null;
+  treeTall: HTMLImageElement | null;
+  treeShort: HTMLImageElement | null;
+  cloudDay: HTMLImageElement | null;
+  cloudDusk: HTMLImageElement | null;
+  moon: HTMLImageElement | null;
+  sun: HTMLImageElement | null;
+}
 
 function pr(n: number) {
   return Math.round(n);
@@ -29,13 +39,15 @@ interface Cloud {
   h: number;
 }
 
-export function drawSky(
-  ctx: CanvasRenderingContext2D,
-  frame: number,
-  stars: Star[],
-  clouds: Cloud[]
-) {
-  const bands: [number, string][] = [
+const SKY_BANDS: Record<TimeOfDay, [number, string][]> = {
+  day: [
+    [0.0, "#2e68c0"],
+    [0.2, "#4888d8"],
+    [0.45, "#72aee8"],
+    [0.7, "#a4d0f4"],
+    [1.0, "#cce8fa"],
+  ],
+  dusk: [
     [0.0, "#12082a"],
     [0.12, "#1e0e38"],
     [0.22, "#3a1050"],
@@ -47,7 +59,43 @@ export function drawSky(
     [0.82, "#fad060"],
     [0.9, "#fce090"],
     [1.0, "#fce090"],
-  ];
+  ],
+  night: [
+    [0.0, "#020412"],
+    [0.25, "#05081e"],
+    [0.5, "#080c28"],
+    [0.75, "#0c1030"],
+    [1.0, "#12183e"],
+  ],
+};
+
+const TREE_DATA: [number, number, number][] = [
+  [0, 52, 50],
+  [30, 40, 68],
+  [62, 48, 54],
+  [100, 36, 62],
+  [128, 52, 46],
+  [170, 42, 58],
+  [200, 32, 54],
+  [216, 54, 48],
+  [258, 46, 66],
+  [290, 40, 50],
+  [318, 58, 44],
+  [362, 42, 60],
+  [394, 50, 52],
+  [430, 38, 58],
+  [460, 44, 50],
+];
+
+export function drawSky(
+  ctx: CanvasRenderingContext2D,
+  frame: number,
+  stars: Star[],
+  clouds: Cloud[],
+  timeOfDay: TimeOfDay,
+  sprites: BgSprites
+) {
+  const bands = SKY_BANDS[timeOfDay];
   for (let i = 0; i < bands.length - 1; i++) {
     const y1 = bands[i][0] * WATER_Y;
     const y2 = bands[i + 1][0] * WATER_Y;
@@ -55,74 +103,110 @@ export function drawSky(
     ctx.fillRect(0, pr(y1), W, pr(y2 - y1) + 1);
   }
 
-  // Stars
-  const t = frame * 0.018;
-  for (const s of stars) {
-    const twinkle = 0.4 + 0.5 * Math.abs(Math.sin(s.p * 0.1 + t));
-    ctx.globalAlpha = twinkle * (s.y < 80 ? 0.9 : 0.5);
-    ctx.fillStyle = "#fff8e0";
-    ctx.fillRect(pr(s.x), pr(s.y), s.s, s.s);
-  }
-  ctx.globalAlpha = 1;
-
-  // Moon
-  ctx.fillStyle = "#fff8d0";
-  ctx.beginPath();
-  ctx.arc(62, 36, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#1e0e38";
-  ctx.beginPath();
-  ctx.arc(70, 32, 13, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Clouds
-  for (const c of clouds) {
-    ctx.globalAlpha = 0.28;
-    ctx.fillStyle = "#f8c080";
-    ctx.fillRect(pr(c.x), pr(c.y), pr(c.w), pr(c.h));
-    ctx.fillRect(
-      pr(c.x + 10),
-      pr(c.y - c.h * 0.55),
-      pr(c.w - 20),
-      pr(c.h * 0.75)
-    );
-    ctx.fillRect(pr(c.x + 4), pr(c.y - c.h * 0.2), pr(c.w - 8), pr(c.h * 0.4));
+  // Stars — shown at night (bright) and dusk (faint)
+  if (timeOfDay !== "day") {
+    const starAlphaScale = timeOfDay === "night" ? 1 : 0.3;
+    const t = frame * 0.018;
+    for (const s of stars) {
+      const twinkle = 0.4 + 0.5 * Math.abs(Math.sin(s.p * 0.1 + t));
+      ctx.globalAlpha = twinkle * (s.y < 80 ? 0.9 : 0.5) * starAlphaScale;
+      ctx.fillStyle = "#fff8e0";
+      ctx.fillRect(pr(s.x), pr(s.y), s.s, s.s);
+    }
     ctx.globalAlpha = 1;
   }
 
-  // Silhouette tree line
-  ctx.fillStyle = "#0d0818";
-  const treeData: [number, number, number][] = [
-    [0, 52, 50],
-    [30, 40, 68],
-    [62, 48, 54],
-    [100, 36, 62],
-    [128, 52, 46],
-    [170, 42, 58],
-    [200, 32, 54],
-    [216, 54, 48],
-    [258, 46, 66],
-    [290, 40, 50],
-    [318, 58, 44],
-    [362, 42, 60],
-    [394, 50, 52],
-    [430, 38, 58],
-    [460, 44, 50],
-  ];
-  for (const [tx, tw, th] of treeData) {
-    ctx.fillRect(pr(tx + tw / 2 - 3), pr(WATER_Y - th * 0.5), 6, pr(th * 0.5));
-    ctx.beginPath();
-    ctx.moveTo(pr(tx), pr(WATER_Y - th * 0.42));
-    ctx.lineTo(pr(tx + tw / 2), pr(WATER_Y - th));
-    ctx.lineTo(pr(tx + tw), pr(WATER_Y - th * 0.42));
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(pr(tx + 4), pr(WATER_Y - th * 0.28));
-    ctx.lineTo(pr(tx + tw / 2), pr(WATER_Y - th * 0.62));
-    ctx.lineTo(pr(tx + tw - 4), pr(WATER_Y - th * 0.28));
-    ctx.closePath();
-    ctx.fill();
+  // Moon sprite — night only
+  if (timeOfDay === "night") {
+    if (sprites.moon) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sprites.moon, 38, 14, 48, 48);
+    } else {
+      ctx.fillStyle = "#fff8d0";
+      ctx.beginPath();
+      ctx.arc(62, 36, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#12183e";
+      ctx.beginPath();
+      ctx.arc(70, 32, 13, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Sun sprite — day (upper right) and dusk (near horizon, orange-tinted)
+  if (timeOfDay === "day" && sprites.sun) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprites.sun, 580, 24, 48, 48);
+  } else if (timeOfDay === "dusk" && sprites.sun) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 0.7;
+    ctx.drawImage(sprites.sun, 600, 148, 48, 48);
+    ctx.globalAlpha = 1;
+  }
+
+  // Trees
+  ctx.imageSmoothingEnabled = false;
+  for (let i = 0; i < TREE_DATA.length; i++) {
+    const [tx, tw, th] = TREE_DATA[i];
+    const sprite = i % 2 === 0 ? sprites.treeTall : sprites.treeShort;
+    if (sprite && timeOfDay !== "night") {
+      const alpha = timeOfDay === "dusk" ? 0.85 : 1;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(sprite, pr(tx), pr(WATER_Y - th), tw, th);
+      ctx.globalAlpha = 1;
+    } else {
+      // Dark silhouette for night or sprite fallback
+      ctx.fillStyle = timeOfDay === "night" ? "#0d0818" : "#182a10";
+      ctx.fillRect(
+        pr(tx + tw / 2 - 3),
+        pr(WATER_Y - th * 0.5),
+        6,
+        pr(th * 0.5)
+      );
+      ctx.beginPath();
+      ctx.moveTo(pr(tx), pr(WATER_Y - th * 0.42));
+      ctx.lineTo(pr(tx + tw / 2), pr(WATER_Y - th));
+      ctx.lineTo(pr(tx + tw), pr(WATER_Y - th * 0.42));
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(pr(tx + 4), pr(WATER_Y - th * 0.28));
+      ctx.lineTo(pr(tx + tw / 2), pr(WATER_Y - th * 0.62));
+      ctx.lineTo(pr(tx + tw - 4), pr(WATER_Y - th * 0.28));
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // Clouds — day uses fluffy white, dusk uses wispy orange, night skips
+  if (timeOfDay !== "night") {
+    const cloudSprite =
+      timeOfDay === "day" ? sprites.cloudDay : sprites.cloudDusk;
+    for (const c of clouds) {
+      if (cloudSprite) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha = timeOfDay === "dusk" ? 0.75 : 0.85;
+        ctx.drawImage(cloudSprite, pr(c.x - 8), pr(c.y - 20), pr(c.w + 20), 48);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = timeOfDay === "day" ? "#e8f4ff" : "#f8c080";
+        ctx.fillRect(pr(c.x), pr(c.y), pr(c.w), pr(c.h));
+        ctx.fillRect(
+          pr(c.x + 10),
+          pr(c.y - c.h * 0.55),
+          pr(c.w - 20),
+          pr(c.h * 0.75)
+        );
+        ctx.fillRect(
+          pr(c.x + 4),
+          pr(c.y - c.h * 0.2),
+          pr(c.w - 8),
+          pr(c.h * 0.4)
+        );
+        ctx.globalAlpha = 1;
+      }
+    }
   }
 }
 
@@ -136,29 +220,73 @@ interface BgFish {
   fi: number;
 }
 
+const WATER_COLORS: Record<
+  TimeOfDay,
+  {
+    base1: string;
+    base2: string;
+    ref1: string;
+    ref1a: number;
+    ref2?: string;
+    ref2a?: number;
+    wave: string;
+  }
+> = {
+  day: {
+    base1: "#1a5a98",
+    base2: "#0e3c70",
+    ref1: "#90d0f8",
+    ref1a: 0.1,
+    wave: "#2a6ab0",
+  },
+  dusk: {
+    base1: "#0c1c30",
+    base2: "#081420",
+    ref1: "#c04820",
+    ref1a: 0.15,
+    ref2: "#f09030",
+    ref2a: 0.1,
+    wave: "#1a3a5a",
+  },
+  night: {
+    base1: "#040e1c",
+    base2: "#020810",
+    ref1: "#304878",
+    ref1a: 0.06,
+    wave: "#0a1c30",
+  },
+};
+
 export function drawWater(
   ctx: CanvasRenderingContext2D,
   waterAnim: number,
   bgFish: BgFish[],
   fishTypes: FishType[],
-  fishSprites: (HTMLImageElement | null)[]
+  fishSprites: (HTMLImageElement | null)[],
+  timeOfDay: TimeOfDay
 ) {
-  ctx.fillStyle = "#0c1c30";
+  const wc = WATER_COLORS[timeOfDay];
+
+  ctx.fillStyle = wc.base1;
   ctx.fillRect(0, WATER_Y, W, H - WATER_Y);
-  ctx.fillStyle = "#081420";
+  ctx.fillStyle = wc.base2;
   ctx.fillRect(0, WATER_Y + 28, W, H - WATER_Y - 28);
-  ctx.fillStyle = "#c04820";
-  ctx.globalAlpha = 0.15;
+
+  ctx.fillStyle = wc.ref1;
+  ctx.globalAlpha = wc.ref1a;
   ctx.fillRect(0, WATER_Y, W, 16);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "#f09030";
-  ctx.globalAlpha = 0.1;
-  ctx.fillRect(0, WATER_Y, W, 8);
-  ctx.globalAlpha = 1;
+
+  if (wc.ref2 && wc.ref2a) {
+    ctx.fillStyle = wc.ref2;
+    ctx.globalAlpha = wc.ref2a;
+    ctx.fillRect(0, WATER_Y, W, 8);
+    ctx.globalAlpha = 1;
+  }
 
   for (let i = 0; i < 14; i++) {
     const rx = (waterAnim * 20 + i * 50) % W;
-    ctx.strokeStyle = "#1a3a5a";
+    ctx.strokeStyle = wc.wave;
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -178,99 +306,76 @@ export function drawWater(
 
 // ─── Ground & Dock ───────────────────────────────────────────────────────────
 
-export function drawGround(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = "#182810";
+const GROUND_LAYERS: Record<
+  TimeOfDay,
+  [string, string, string, string, string]
+> = {
+  day: ["#2a3c1a", "#3a5020", "#486828", "#5c7e30", "#688a32"],
+  dusk: ["#182810", "#223812", "#2c4e18", "#386020", "#406820"],
+  night: ["#0e1c08", "#182810", "#20380e", "#2a4814", "#2e4a14"],
+};
+
+export function drawGround(
+  ctx: CanvasRenderingContext2D,
+  timeOfDay: TimeOfDay
+) {
+  const [l0, l1, l2, l3, l4] = GROUND_LAYERS[timeOfDay];
+  const soilCol =
+    timeOfDay === "day"
+      ? "#382010"
+      : timeOfDay === "night"
+        ? "#140a04"
+        : "#200e08";
+
+  ctx.fillStyle = l0;
   ctx.fillRect(0, WATER_Y - 2, W * 0.54, 8);
-  ctx.fillStyle = "#223812";
+  ctx.fillStyle = l1;
   ctx.fillRect(0, WATER_Y - 8, W * 0.54, 8);
-  ctx.fillStyle = "#2c4e18";
+  ctx.fillStyle = l2;
   ctx.fillRect(0, WATER_Y - 14, W * 0.54, 8);
-  ctx.fillStyle = "#386020";
+  ctx.fillStyle = l3;
   ctx.fillRect(0, WATER_Y - 20, W * 0.48, 8);
-  ctx.fillStyle = "#406820";
+  ctx.fillStyle = l4;
   for (let i = 0; i < 20; i++) {
     ctx.fillRect(pr(i * 20 + 3), pr(WATER_Y - 22), 2, 5);
     ctx.fillRect(pr(i * 20 + 9), pr(WATER_Y - 24), 2, 7);
   }
-  ctx.fillStyle = "#200e08";
+  ctx.fillStyle = soilCol;
   ctx.fillRect(0, WATER_Y + 4, W * 0.5, 10);
 }
 
-export function drawDock(ctx: CanvasRenderingContext2D) {
-  const dx = 308,
-    dw = 375;
+// Sprite render y: dock planks align with DOCK_Y. Tune if sprite content shifts.
+const DOCK_SPRITE_Y = DOCK_Y - 94;
+const DOCK_SPRITE_W = 320;
+const DOCK_SPRITE_H = 80;
 
-  // Piling shadows
-  ctx.fillStyle = "#00000040";
-  for (let i = 0; i < 5; i++) {
-    const px = dx + 16 + i * (dw / 4.6);
-    ctx.fillRect(pr(px + 3), pr(DOCK_Y + 22), 8, H - DOCK_Y - 22);
-  }
+export function drawDock(
+  ctx: CanvasRenderingContext2D,
+  dockSprite: HTMLImageElement | null,
+  timeOfDay: TimeOfDay
+) {
+  const dx = 308;
 
-  // Pilings
-  for (let i = 0; i < 5; i++) {
-    const px = dx + 16 + i * (dw / 4.6);
-    ctx.fillStyle = "#3a1e08";
-    ctx.fillRect(pr(px), pr(DOCK_Y + 22), 8, H - DOCK_Y - 22);
-    ctx.fillStyle = "#5a3010";
-    ctx.fillRect(pr(px), pr(DOCK_Y + 22), 3, H - DOCK_Y - 22);
-    ctx.fillStyle = "#6b4018";
-    ctx.fillRect(pr(px - 2), pr(DOCK_Y + 18), 12, 6);
-    ctx.fillStyle = "#3a1e08";
-    ctx.fillRect(pr(px - 3), pr(DOCK_Y + 18), 14, 3);
-  }
+  if (dockSprite) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(dockSprite, dx, DOCK_SPRITE_Y, DOCK_SPRITE_W, DOCK_SPRITE_H);
 
-  // Deck planks
-  for (let i = 0; i < 20; i++) {
-    const px = dx + i * (dw / 20);
-    ctx.fillStyle = i % 2 === 0 ? "#8b5c28" : "#7a4c20";
-    ctx.fillRect(pr(px), pr(DOCK_Y), pr(dw / 20 - 1), 22);
-    ctx.fillStyle = "#c09060";
-    ctx.globalAlpha = 0.1;
-    ctx.fillRect(pr(px), pr(DOCK_Y), pr(dw / 20 - 1), 3);
+    // Lantern glow — always drawn on top of sprite so it animates and reacts to time of day
+    const glowAlpha =
+      timeOfDay === "night" ? 0.06 : timeOfDay === "dusk" ? 0.04 : 0;
+    const glowCol = timeOfDay === "day" ? "#ffe080" : "#ffe060";
+    const lx = dx + 36;
+    const ly = DOCK_Y - 85;
+    ctx.fillStyle = glowCol;
+    for (let r = 1; r <= 4; r++) {
+      ctx.globalAlpha = glowAlpha;
+      ctx.beginPath();
+      ctx.arc(lx, ly + 6, r * 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.globalAlpha = 1;
-    ctx.fillStyle = "#2a1008";
-    ctx.fillRect(pr(px), pr(DOCK_Y + 20), pr(dw / 20 - 1), 2);
+    return;
   }
-
-  // Railing posts
-  for (let i = 0; i < 5; i++) {
-    const px = dx + i * (dw / 4);
-    ctx.fillStyle = "#4a2808";
-    ctx.fillRect(pr(px), pr(DOCK_Y - 20), 5, 20);
-    ctx.fillStyle = "#6b3810";
-    ctx.fillRect(pr(px), pr(DOCK_Y - 20), 2, 20);
-    ctx.fillStyle = "#5a3010";
-    ctx.fillRect(pr(px - 2), pr(DOCK_Y - 23), 9, 5);
-  }
-  ctx.fillStyle = "#6b3810";
-  ctx.fillRect(pr(dx), pr(DOCK_Y - 22), dw, 4);
-  ctx.fillStyle = "#8b5020";
-  ctx.fillRect(pr(dx), pr(DOCK_Y - 22), dw, 2);
-
-  // Lantern
-  const lx = dx + 8,
-    ly = DOCK_Y - 44;
-  ctx.fillStyle = "#2a1008";
-  ctx.fillRect(pr(lx + 4), pr(ly - 6), 4, 8);
-  ctx.fillStyle = "#3a1e08";
-  ctx.fillRect(pr(lx), pr(ly), 14, 18);
-  ctx.fillStyle = "#6b4010";
-  ctx.fillRect(pr(lx), pr(ly), 14, 3);
-  ctx.fillStyle = "#6b4010";
-  ctx.fillRect(pr(lx), pr(ly + 15), 14, 3);
-  ctx.fillStyle = "#ffe080";
-  ctx.globalAlpha = 0.95;
-  ctx.fillRect(pr(lx + 2), pr(ly + 3), 10, 12);
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = "#ffe060";
-  for (let r = 1; r <= 4; r++) {
-    ctx.globalAlpha = 0.07;
-    ctx.beginPath();
-    ctx.arc(lx + 7, ly + 9, r * 14, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
 }
 
 // ─── Character ───────────────────────────────────────────────────────────────
@@ -280,17 +385,17 @@ export function drawDock(ctx: CanvasRenderingContext2D) {
 //   public/fishing-game/ranger/animations/animating-74fb7b4e/east/ — 7-frame throw-object (cast)
 //   public/fishing-game/ranger/animations/animating-73714f41/east/ — 5-frame picking-up (catch)
 const SRC_SIZE = 68;
-const SPRITE_SCALE = 2;
-const SPRITE_W = SRC_SIZE * SPRITE_SCALE; // 136
-const SPRITE_H = SRC_SIZE * SPRITE_SCALE; // 136
+const SPRITE_SCALE = 1;
+const SPRITE_W = SRC_SIZE * SPRITE_SCALE;
+const SPRITE_H = SRC_SIZE * SPRITE_SCALE;
 // Tune so the character stands on the dock surface (DOCK_Y = 174).
-const SPRITE_X = CHAR_X - 46; // 342
-const SPRITE_Y = DOCK_Y - 112; // 62 — character feet at ~56px in source × 2
+const SPRITE_X = CHAR_X - 26;
+const SPRITE_Y = DOCK_Y - 108;
 
 // Pixel offset from sprite origin to the rod tip (at SPRITE_SCALE).
 // Tune after visual inspection — the fishing line anchors here.
-const ROD_TIP_OX = 32; // west-facing: rod extends left, tip near left edge
-const ROD_TIP_OY = 50;
+const ROD_TIP_OX = 10; // west-facing: rod extends left, tip near left edge
+const ROD_TIP_OY = 20;
 
 export function drawCharacter(
   ctx: CanvasRenderingContext2D,
@@ -429,7 +534,7 @@ function drawBobber(
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(x, WATER_Y + 2, 9, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, WATER_Y + 24, 9, 3, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
 }
@@ -489,7 +594,17 @@ export function drawFish(
     ctx.imageSmoothingEnabled = false;
     ctx.translate(x, y);
     if (d === -1) ctx.scale(-1, 1);
-    ctx.drawImage(sprite, 0, 0, 48, 48, -hw, -hh, renderSize, renderSize * scaleY);
+    ctx.drawImage(
+      sprite,
+      0,
+      0,
+      48,
+      48,
+      -hw,
+      -hh,
+      renderSize,
+      renderSize * scaleY
+    );
     ctx.restore();
     ctx.globalAlpha = 1;
     return;
@@ -622,7 +737,17 @@ export function drawCatchAnimation(
     const prog = Math.min(a.t / 20, 1);
     const fy = a.sy - prog * prog * 70;
     const next = { ...a, cy: fy };
-    drawFish(ctx, pr(a.cx), pr(fy), 1, fish, 1, sprite, a.t, sprite ? 120 : undefined);
+    drawFish(
+      ctx,
+      pr(a.cx),
+      pr(fy),
+      1,
+      fish,
+      1,
+      sprite,
+      a.t,
+      sprite ? 120 : undefined
+    );
     if (a.t >= 20) return { ...next, phase: 1, t: 0 };
     return next;
   }
@@ -639,7 +764,17 @@ export function drawCatchAnimation(
       }
       ctx.globalAlpha = 1;
     }
-    drawFish(ctx, pr(a.cx), pr(a.cy), 1, fish, 1, sprite, a.t, sprite ? 120 : undefined);
+    drawFish(
+      ctx,
+      pr(a.cx),
+      pr(a.cy),
+      1,
+      fish,
+      1,
+      sprite,
+      a.t,
+      sprite ? 120 : undefined
+    );
     const labelYBase = sprite ? a.cy - 76 : a.cy - 32;
     const ptsYBase = sprite ? a.cy - 64 : a.cy - 20;
     ctx.font = "bold 11px monospace";
@@ -658,7 +793,17 @@ export function drawCatchAnimation(
   }
 
   // Phase 2 — fade out
-  drawFish(ctx, pr(a.cx), pr(a.cy), 1, fish, Math.max(0, 1 - a.t / 14), sprite, a.t, sprite ? 120 : undefined);
+  drawFish(
+    ctx,
+    pr(a.cx),
+    pr(a.cy),
+    1,
+    fish,
+    Math.max(0, 1 - a.t / 14),
+    sprite,
+    a.t,
+    sprite ? 120 : undefined
+  );
   if (a.t >= 14) return null;
   return a;
 }
